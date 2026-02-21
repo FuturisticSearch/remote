@@ -1,16 +1,9 @@
 {
-  "name": "remote-novnc",
+  "name": "remote-vnc",
   "version": "1.0.0",
-  "description": "Remote VNC web interface using noVNC and websockify",
-  "main": "config.js",
+  "description": "Remote VNC setup",
   "scripts": {
-    "start": "node config.js"
-  },
-  "dependencies": {
-    "@maximegris/node-websockify": "^1.0.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "cmd /c run.bat"
   },
   "author": "QikSeek",
   "license": "MIT"
