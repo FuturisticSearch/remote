@@ -1,0 +1,1 @@
+2026/02/20 16:35:54 [error] 13212#16636: *1 CreateFile() "C:\ProgramData\server\nginx/html/favicon.ico" failed (2: Systém nemùže nalézt uvedený soubor), client: 127.0.0.1, server: localhost, request: "GET /favicon.ico HTTP/1.1", host: "localhost", referrer: "http://localhost/"
