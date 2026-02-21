@@ -1,6 +1,12 @@
 @echo off
 set "NO_VNC_DIR=C:\ProgramData\server\noVnc"
 
+:: Start TightVNC server hidden
+start "" "C:\Program Files\TightVNC\tvnserver.exe"
+
+:: Wait a few seconds for TightVNC to initialize
+timeout /t 5 /nobreak >nul
+
 :: Run node hidden
 powershell -WindowStyle Hidden -Command "Start-Process node -ArgumentList 'config.js' -WorkingDirectory '%NO_VNC_DIR%' -WindowStyle Hidden"
 
