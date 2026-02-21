@@ -1,100 +1,125 @@
 # ------------------------------
-# Remote VNC Installer + Autorun
+# Remote VNC Installer + Autorun with Logging
 # ------------------------------
 
-Write-Host "=== Remote VNC Installer + Autorun ===" -ForegroundColor Cyan
+# Auto-elevate
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit
+}
 
-# Base installer folder
+$ErrorActionPreference = "Stop"
+
+# Installer base
 $installerDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoDir = Join-Path $installerDir "remote"
+$logFile = Join-Path $installerDir "installer-log.txt"
+
+# Function to log messages
+function Log {
+    param([string]$msg)
+    $time = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $line = "[$time] $msg"
+    Write-Host $line
+    Add-Content -Path $logFile -Value $line
+}
+
+Log "=== Remote VNC Installer Started ==="
 
 # ------------------------------
-# Clone GitHub repository
+# Clone repository
 # ------------------------------
-Write-Host "Cloning repository..."
 if (-not (Test-Path (Join-Path $repoDir ".git"))) {
-    git clone https://github.com/FuturisticSearch/remote $repoDir
+    Log "Cloning repository..."
+    git clone https://github.com/FuturisticSearch/remote $repoDir | Out-Null
 } else {
-    Write-Host "Repository already cloned."
+    Log "Repository already cloned."
 }
 
 # ------------------------------
-# Download Node.js LTS portable
+# Node.js check
 # ------------------------------
-$nodeZipUrl = "https://nodejs.org/dist/v20.6.1/node-v20.6.1-win-x64.zip"
-$nodeZipPath = Join-Path $installerDir "node.zip"
-$nodeDir = Join-Path $installerDir "node"
+$nodeCheck = Get-Command node -ErrorAction SilentlyContinue
+$npmCheck  = Get-Command npm  -ErrorAction SilentlyContinue
 
-Write-Host "Downloading Node.js..."
-Invoke-WebRequest -Uri $nodeZipUrl -OutFile $nodeZipPath
-
-Write-Host "Extracting Node.js..."
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::ExtractToDirectory($nodeZipPath, $nodeDir)
-Remove-Item $nodeZipPath
-Write-Host "Node.js installed to $nodeDir"
-
-$nodeExe = Join-Path $nodeDir "node.exe"
-$npmExe = Join-Path $nodeDir "npm.cmd"
+if (-not $nodeCheck -or -not $npmCheck) {
+    Log "Node.js not found. Installing Node.js LTS via winget..."
+    Start-Process -FilePath "winget" -ArgumentList "install OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements" -Wait -NoNewWindow
+} else {
+    Log "Node.js already installed."
+}
 
 # ------------------------------
 # Install websockify globally
 # ------------------------------
-Write-Host "Installing websockify..."
-Start-Process -FilePath $nodeExe -ArgumentList "$npmExe install -g @maximegris/node-websockify" -Wait
+try {
+    Log "Installing websockify globally..."
+    & npm install -g @maximegris/node-websockify 2>&1 | ForEach-Object { Log $_ }
+    Log "Websockify installed."
+} catch {
+    Log "Failed to install websockify: $_"
+}
 
 # ------------------------------
-# Install TightVNC
+# TightVNC
 # ------------------------------
-$tvncUrl = "https://www.tightvnc.com/download/2.8.81/tightvnc-2.8.81-gpl-setup-64bit.msi"
-$tvncInstaller = Join-Path $installerDir "tightvnc.msi"
-
-Write-Host "Downloading TightVNC..."
-Invoke-WebRequest -Uri $tvncUrl -OutFile $tvncInstaller
-
-Write-Host "Installing TightVNC silently..."
-Start-Process msiexec.exe -ArgumentList "/i `"$tvncInstaller`" /quiet /norestart" -Wait
+$tvncCheck = Get-Command tvnserver -ErrorAction SilentlyContinue
+if (-not $tvncCheck) {
+    Log "Installing TightVNC..."
+    $tvncUrl = "https://www.tightvnc.com/download/2.8.81/tightvnc-2.8.81-gpl-setup-64bit.msi"
+    $tvncInstaller = Join-Path $env:TEMP "tightvnc.msi"
+    Invoke-WebRequest -Uri $tvncUrl -OutFile $tvncInstaller
+    Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$tvncInstaller`" /quiet /norestart" -Wait -NoNewWindow
+    Remove-Item $tvncInstaller -Force
+    Log "TightVNC installed."
+} else {
+    Log "TightVNC already installed."
+}
 
 # ------------------------------
-# Install Nginx
+# Nginx
 # ------------------------------
-$nginxZipUrl = "http://nginx.org/download/nginx-1.26.1.zip"
-$nginxZip = Join-Path $installerDir "nginx.zip"
-$nginxDir = Join-Path $installerDir "nginx"
-$tempExtract = Join-Path $installerDir "nginx_temp"
-
-Write-Host "Downloading Nginx..."
-Invoke-WebRequest -Uri $nginxZipUrl -OutFile $nginxZip
-
-Write-Host "Extracting Nginx..."
-[System.IO.Compression.ZipFile]::ExtractToDirectory($nginxZip, $tempExtract)
-
-# Move extracted files up one level to nginx folder
-$subFolder = Get-ChildItem -Path $tempExtract | Where-Object {$_.PSIsContainer} | Select-Object -First 1
-Get-ChildItem $subFolder.FullName | ForEach-Object { Move-Item -Path $_.FullName -Destination $nginxDir -Force }
-
-# Cleanup temp files
-Remove-Item $nginxZip, $tempExtract -Recurse -Force
-Write-Host "Nginx installed to $nginxDir"
+$nginxDir = "C:\nginx"
+if (-not (Test-Path (Join-Path $nginxDir "nginx.exe"))) {
+    Log "Installing Nginx..."
+    $nginxZipUrl = "http://nginx.org/download/nginx-1.26.1.zip"
+    $nginxZip = Join-Path $env:TEMP "nginx.zip"
+    $tempExtract = Join-Path $env:TEMP "nginx_temp"
+    Invoke-WebRequest -Uri $nginxZipUrl -OutFile $nginxZip
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($nginxZip, $tempExtract)
+    $subFolder = Get-ChildItem -Path $tempExtract | Where-Object {$_.PSIsContainer} | Select-Object -First 1
+    if (-not (Test-Path $nginxDir)) { New-Item -ItemType Directory -Force -Path $nginxDir | Out-Null }
+    Get-ChildItem $subFolder.FullName | ForEach-Object { Move-Item -Path $_.FullName -Destination $nginxDir -Force }
+    Remove-Item $nginxZip, $tempExtract -Recurse -Force
+    Log "Nginx installed."
+} else {
+    Log "Nginx already installed."
+}
 
 # ------------------------------
 # Task Scheduler autorun
 # ------------------------------
-$runBat = Join-Path $repoDir "run.bat"
+$runBat = Join-Path $repoDir "vnc.bat"
 $taskName = "RemoteVNC_Autorun"
 $taskExists = schtasks /Query /TN $taskName 2>$null
-
 if (-not $taskExists) {
-    Write-Host "Creating scheduled task for run.bat on system startup..."
+    Log "Creating scheduled task for vnc.bat..."
     schtasks /Create /TN $taskName /TR "`"$runBat`"" /SC ONSTART /RL HIGHEST /F
-    Write-Host "Scheduled task created: $taskName"
+    Log "Scheduled task created."
 } else {
-    Write-Host "Scheduled task already exists."
+    Log "Scheduled task already exists."
 }
 
 # ------------------------------
-# Run run.bat immediately
+# Run vnc.bat immediately
 # ------------------------------
-Write-Host "Starting run.bat now..."
-Start-Process -FilePath $runBat -WindowStyle Hidden
-Write-Host "run.bat started hidden. Setup complete."
+if (Test-Path $runBat) {
+    Log "Starting vnc.bat..."
+    Start-Process -FilePath $runBat -WindowStyle Hidden
+    Log "vnc.bat started. Setup complete."
+} else {
+    Log "Error: vnc.bat not found in repo folder!"
+}
+
+Log "=== Remote VNC Installer Finished ==="
