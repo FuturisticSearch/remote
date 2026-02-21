@@ -1,5 +1,17 @@
 {
+  "name": "remote-novnc",
+  "version": "1.0.0",
+  "description": "Remote VNC web interface using noVNC and websockify",
+  "main": "config.js",
+  "scripts": {
+    "start": "node config.js"
+  },
   "dependencies": {
-    "cloudflared": "^0.7.1"
-  }
+    "@maximegris/node-websockify": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "QikSeek",
+  "license": "MIT"
 }
