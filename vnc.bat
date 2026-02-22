@@ -1,15 +1,22 @@
 @echo off
 :: -------------------------------
 :: Windows VNC Client Connector – sequential ID
+:: Works from any directory
 :: -------------------------------
 
-set "NO_VNC_DIR=C:\ProgramData\server\noVnc"
+:: Get the directory where this batch file resides
+set "SCRIPT_DIR=%~dp0"
+:: Remove trailing backslash if needed
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+
+:: Set paths relative to the batch file
+set "NO_VNC_DIR=%SCRIPT_DIR%\noVnc"
 set "HUB_URL=vnc.qikseek.qzz.io"
 set "ID_FILE=%NO_VNC_DIR%\last_id.txt"
 
 :: Determine next sequential ID
 if exist "%ID_FILE%" (
-    set /p LAST_ID=<%ID_FILE%
+    set /p LAST_ID=<"%ID_FILE%"
     set /a REPEATER_ID=LAST_ID+1
 ) else (
     set REPEATER_ID=1
